@@ -1,0 +1,28 @@
+{
+  "author": "Dan Egnor <egnor@ofb.net>",
+  "bugs": {
+    "url": "https://github.com/egnor/recma-plugin-jsx-if-for/issues"
+  },
+  "dependencies": {
+    "debug": "^4.4.0",
+    "estree-util-to-js": "^2.0.0",
+    "estree-walker": "^3.0.3",
+    "vfile-message": "^4.0.2"
+  },
+  "description": "Plugin for MDX (mdxjs.com) to rewrite JSX <$if> and <$for> pseudocomponents to Javascript if/for expressions",
+  "homepage": "https://github.com/egnor/recma-plugin-jsx-if-for#readme",
+  "license": "MIT",
+  "keywords": [
+    "recma-plugin",
+    "jsx",
+    "mdx"
+  ],
+  "main": "index.js",
+  "name": "recma-plugin-jsx-if-for",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/egnor/recma-plugin-jsx-if-for.git"
+  },
+  "type": "module",
+  "version": "1.0.0"
+}
