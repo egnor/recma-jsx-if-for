@@ -3,10 +3,10 @@ import * as estreeWalker from "estree-walker";
 import * as estreeToJs from "estree-util-to-js";
 import { VFileMessage } from "vfile-message";
 
-// Use DEBUG=recma-jsx-if-for for debugging output
-const debug = Debug("recma-jsx-if-for");
-const debugFile = Debug("recma-jsx-if-for-file");
-const debugTree = Debug("recma-jsx-if-for-tree");
+// Use DEBUG=recma-plugin-jsx-if-for for debugging output
+const debug = Debug("recma-plugin-jsx-if-for");
+const debugFile = Debug(`${debug.namespace}-file`);
+const debugTree = Debug(`${debug.namespace}-tree`);
 
 const hideProps = ["type", "start", "end", "loc", "range"];
 
