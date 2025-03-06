@@ -1,4 +1,4 @@
-# recma-jsx-if-for
+# recma-plugin-jsx-if-for
 MDX plugin (https://github.com/mdx-js/recma) to translate
 &lt;$if>, &lt;$for>, &lt;$let>, etc. into Javascript
 
@@ -45,7 +45,7 @@ npm i recma-plugin-jsx-if-for
 Configure MDX to use this plugin,
 [wherever you integrate MDX](https://mdxjs.com/docs/getting-started/):
 ```js
-import recmaJsxIfFor from "recma-jsx-if-for";
+import recmaJsxIfFor from "recma-plugin-jsx-if-for";
 ...
 const mdxOptions = { jsx: true, recmaPlugins: [recmaJsxIfFor] };
 ...
