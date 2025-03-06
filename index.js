@@ -96,65 +96,93 @@ const elementNameHandlers = {
 
   // Rewrite <$if test={expr}>...</$if> to <>{(expr) ? <>...</> : null}</>
   $if: function(node, parent, prop, index) {
-    const chain = [node];
+    const open = node.openingElement;
+    debug("Rewriting %s", debug.enabled && unparse(open));
 
-    if (parent && prop && index >= 0) {
-      var pi = index + 1;
-      debug("CHECKING %s", parent[prop][pi]?.openingElement?.name?.name);
-      while (parent[prop][pi]?.openingElement?.name?.name === "$else-if") ++pi;
-      if (parent[prop][pi]?.openingElement?.name?.name === "$else") ++pi;
-      chain.push(...parent[prop].splice(index + 1, pi - (index + 1)));
-    }
-
-    debug(
-      "Rewriting if-chain:\n  %s",
-      debug.enabled && chain.map(n => unparse(n.openingElement)).join("\n  ")
+    const nodeContext = [parent, node, open];
+    const { test: testAttr, ...extraAttrs } = Object.fromEntries(
+      open.attributes.map(a => [a.name.name, a])
     );
-
-    var newExpr = { type: "Literal", value: null };
-
-    for (var cond of chain.reverse()) {
-      const open = cond.openingElement;
-      const condContext = [parent, cond, open];
-      const { test: testAttr, ...extraAttrs } = Object.fromEntries(
-        open.attributes.map(a => [a.name.name, a])
-      );
-      if (Object.keys(extraAttrs).length > 0) {
-        const attr = extraAttrs[Object.keys(extraAttrs)[0]];
-        fail(`Bad attribute in ${unparse(open)}`, [...condContext, attr], attr);
-      }
-
-      if (["$if", "$else-if"].includes(cond.openingElement.name.name)) {
-        if (testAttr?.value?.type !== "JSXExpressionContainer") {
-          fail(`Need test={expression} in ${unparse(open)}`, condContext);
-        }
-        newExpr = {
-          type: "ConditionalExpression",
-          test: testAttr.value.expression,
-          consequent: wrapNodesForExpr(cond.children),
-          alternate: newExpr,
-        };
-      } else if (cond.openingElement.name.name === "$else") {
-        if (testAttr) {
-          fail(`Unexpected test=... in ${unparse(open)}`, condContext);
-        }
-        newExpr = wrapNodesForExpr(cond.children);
-      } else {
-        assert(false, `Bad element ${unparse(cond)}`);
-      }
+    if (testAttr?.value?.type !== "JSXExpressionContainer") {
+      fail(`Need test={expression} in ${unparse(open)}`, nodeContext);
     }
+    if (Object.keys(extraAttrs).length > 0) {
+      const attr = extraAttrs[Object.keys(extraAttrs)[0]];
+      fail(`Bad attribute in ${unparse(open)}`, [...nodeContext, attr]);
+    }
+
+    var newExpr = {
+      type: "ConditionalExpression",
+      test: testAttr.value.expression,
+      consequent: wrapNodesForExpr(node.children),
+      alternate: { type: "Literal", value: null },
+    };
 
     this.replace(wrapExprForParent(newExpr, parent));
   },
 
   "$else-if": function(node, parent, prop, index) {
     const open = node.openingElement;
-    fail(`Need preceding <$if> for ${unparse(open)}`, [parent, node, open]);
+    debug("Rewriting %s", debug.enabled && unparse(open));
+
+    const nodeContext = [parent, node, open];
+    const { test: testAttr, ...extraAttrs } = Object.fromEntries(
+      open.attributes.map(a => [a.name.name, a])
+    );
+    if (testAttr?.value?.type !== "JSXExpressionContainer") {
+      fail(`Need test={expression} in ${unparse(open)}`, nodeContext);
+    }
+    if (Object.keys(extraAttrs).length > 0) {
+      const attr = extraAttrs[Object.keys(extraAttrs)[0]];
+      fail(`Bad attribute in ${unparse(open)}`, [...nodeContext, attr]);
+    }
+
+    var pn = parent && prop && index > 0 && parent[prop][index - 1];
+    while (pn?.type === "JSXFragment") pn = pn.children[pn.children.length - 1];
+    if (pn?.type === "JSXExpressionContainer") pn = pn.expression;
+
+    const alt = (n) => n?.type === "ConditionalExpression" && n.alternate;
+    while (alt(pn)?.type === "ConditionalExpression") pn = pn.alternate;
+    if (alt(pn)?.type !== "Literal" || alt(pn)?.value !== null) {
+      fail(`Need <$[else-]if> before ${unparse(open)}`, nodeContext);
+    }
+
+    pn.alternate = {
+      type: "ConditionalExpression",
+      test: testAttr.value.expression,
+      consequent: wrapNodesForExpr(node.children),
+      alternate: { type: "Literal", value: null },
+    };
+
+    this.remove();
   },
 
   "$else": function(node, parent, prop, index) {
     const open = node.openingElement;
-    fail(`Need preceding <$if> for ${unparse(open)}`, [parent, node, open]);
+    debug("Rewriting %s", debug.enabled && unparse(open));
+
+    const nodeContext = [parent, node, open];
+    const extraAttrs = Object.fromEntries(
+      open.attributes.map(a => [a.name.name, a])
+    );
+    if (Object.keys(extraAttrs).length > 0) {
+      const attr = extraAttrs[Object.keys(extraAttrs)[0]];
+      fail(`Bad attribute in ${unparse(open)}`, [...nodeContext, attr]);
+    }
+
+    var pn = parent && prop && index > 0 && parent[prop][index - 1];
+    while (pn?.type === "JSXFragment") pn = pn.children[pn.children.length - 1];
+    if (pn?.type === "JSXExpressionContainer") pn = pn.expression;
+
+    const alt = (n) => n?.type === "ConditionalExpression" && n.alternate;
+    while (alt(pn)?.type === "ConditionalExpression") pn = pn.alternate;
+    if (alt(pn)?.type !== "Literal" || alt(pn)?.value !== null) {
+      fail(`Need <$[else-]if> before ${unparse(open)}`, nodeContext);
+    }
+
+    pn.alternate = wrapNodesForExpr(node.children);
+
+    this.remove();
   },
 
   // Rewrite <$let var={name} value={expr}/>...</$let>
@@ -168,10 +196,10 @@ const elementNameHandlers = {
       open.attributes.map(a => [a.name.name, a])
     );
     if (varAttr?.value?.type !== "JSXExpressionContainer") {
-      fail(`Need var={name} in ${unparse(open)}`, nodeContext);
+      fail(`No var={name} in ${unparse(open)}`, nodeContext);
     }
     if (valAttr?.value?.type !== "JSXExpressionContainer") {
-      fail(`Need value={expression} in ${unparse(open)}`, nodeContext);
+      fail(`No value={expression} in ${unparse(open)}`, nodeContext);
     }
     if (Object.keys(extraAttrs).length > 0) {
       const attr = extraAttrs[Object.keys(extraAttrs)[0]];
@@ -197,8 +225,32 @@ const elementNameHandlers = {
 function patternFromExpr(node, context = []) {
   if (node.type === "Identifier") {
     return node;
+  } else if (node.type === "ArrayExpression") {
+    return {
+      type: "ArrayPattern",
+      elements: node.elements.map(e => patternFromExpr(e, [...context, node])),
+    };
+  } else if (node.type === "ObjectExpression") {
+    return {
+      type: "ObjectPattern",
+      properties: node.properties.map(p => {
+        if (p.type === "Property" && p.key.type === "Identifier") {
+          return {
+            type: "Property",
+            key: p.key,
+            value: patternFromExpr(p.value, context),
+            kind: "init",
+            method: false,
+            shorthand: true,
+            computed: false,
+          };
+        } else {
+          fail(`Bad object pattern ${unparse(node)}`, [...context, node, p]);
+        }
+      }),
+    };
   } else {
-    fail(`Bad variable pattern ${unparse(node)}`, [...context, node]);
+    fail(`Bad pattern ${unparse(node)}`, [...context, node]);
   }
 }
 
